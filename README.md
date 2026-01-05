@@ -1,8 +1,9 @@
 # cost-optimizer-operator
-// TODO(user): Add simple overview of use/purpose
+Kubernetes operator for automatic CPU and memory rightsizing based on workload policies.
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+### Status
+🚧 Work in progress — Phase 1 (CRD + controller scaffolding)
 
 ## Getting Started
 
