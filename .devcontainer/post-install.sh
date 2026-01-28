@@ -17,7 +17,18 @@ mv kubectl /usr/local/bin/kubectl
 docker network create -d=bridge --subnet=172.19.0.0/24 kind
 
 kind version
+
+if ! kind get clusters | grep -q cost-optimizer; then
+  kind create cluster --name cost-optimizer
+fi
+
+mkdir -p ~/.kube
+kind get kubeconfig --name cost-optimizer > ~/.kube/config
+
 kubebuilder version
 docker --version
 go version
 kubectl version --client
+
+apt-get update
+apt-get install -y yq

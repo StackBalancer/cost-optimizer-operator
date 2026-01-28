@@ -86,6 +86,49 @@ type ResourceOptimizerStatus struct {
 	// +listMapKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// currentRecommendation holds the latest resource optimization recommendation
+	// +optional
+	CurrentRecommendation *ResourceRecommendation `json:"currentRecommendation,omitempty"`
+
+	// lastOptimized indicates when the workload was last optimized
+	// +optional
+	LastOptimized *metav1.Time `json:"lastOptimized,omitempty"`
+}
+
+type ResourceRecommendation struct {
+	// CPU resource recommendations
+	CPU CPURecommendation `json:"cpu"`
+
+	// Memory resource recommendations
+	Memory MemoryRecommendation `json:"memory"`
+
+	// Confidence level of the recommendation (0 to 100 percent)
+	// +kubebuilder:validation:Minimum=0
+	// +kubebuilder:validation:Maximum=100
+	Confidence int32 `json:"confidence"`
+
+	// Reason for the recommendation
+	Reason string `json:"reason"`
+
+	// Timestamp when recommendation was generated
+	GeneratedAt metav1.Time `json:"generatedAt"`
+}
+
+type CPURecommendation struct {
+	// Recommended CPU request
+	Request string `json:"request"`
+
+	// Recommended CPU limit
+	Limit string `json:"limit"`
+}
+
+type MemoryRecommendation struct {
+	// Recommended memory request
+	Request string `json:"request"`
+
+	// Recommended memory limit
+	Limit string `json:"limit"`
 }
 
 // +kubebuilder:object:root=true

@@ -2,8 +2,6 @@
   "name": "Kubebuilder DevContainer",
   "image": "docker.io/golang:1.24",
 
-  "updateRemoteUserUID": true,
-
   "features": {
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
       "moby": false

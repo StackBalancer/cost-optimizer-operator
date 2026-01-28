@@ -3,9 +3,79 @@ Kubernetes operator for automatic CPU and memory rightsizing based on workload p
 
 ## Description
 ### Status
-🚧 Work in progress — Phase 1 (CRD + controller scaffolding)
+**Phase 1 Complete** - Controller scaffolding with CRD and initial reconciliation loop
+**Phase 2 Complete** - Metrics Collection & Analysis
 
-## Getting Started
+**Completed Features:**
+- CRD with resource optimization policies
+- Controller scaffolding with reconciliation loop
+- Metrics collection from Kubernetes metrics API
+- Usage analysis and recommendation engine
+- Status reporting with resource recommendations
+- Event recording for optimization activities
+
+**Current Phase:** Phase 3 - Resource Optimization Engine
+
+**Roadmap:**
+- **Phase 3**: Implement actual resource patching
+- **Phase 4**: Real-time adjustment without pod restarts
+- **Phase 5**: Advanced ML-based predictions and cost analytics
+
+## Architecture
+
+The operator follows Kubernetes operator best practices with:
+
+- **Level-triggered reconciliation**: Continuously drives actual state toward desired state
+- **Idempotent operations**: Safe to run multiple times
+- **Metrics-driven decisions**: Uses actual usage data instead of guesses
+- **Policy-based optimization**: Configurable CPU/memory policies per workload
+
+### Components
+
+1. **ResourceOptimizer CRD**: Defines optimization policies for target workloads
+2. **Metrics Collector**: Gathers CPU/memory usage from Kubernetes metrics API
+3. **Analyzer**: Generates resource recommendations based on usage patterns
+4. **Controller**: Orchestrates the optimization lifecycle
+
+## Usage
+
+### 1. Deploy a test workload
+```bash
+kubectl apply -f k8s/test-deployment.yaml
+```
+
+### 2. Create a ResourceOptimizer
+```yaml
+apiVersion: optimization.stackbalancer.io/v1
+kind: ResourceOptimizer
+metadata:
+  name: api-service-optimizer
+  namespace: maintenance
+spec:
+  targetRef:
+    kind: Deployment
+    name: api-service
+    namespace: production
+  policy:
+    cpu:
+      min: "200m"
+      max: "800m"
+      targetUtilization: 70
+    memory:
+      bufferPercent: 20
+```
+
+### 3. Monitor optimization status
+```bash
+kubectl get resourceoptimizer -n <namespace> api-service-optimizer -o yaml
+```
+
+The status will show:
+- Current conditions (DeploymentReady, OptimizationReady)
+- Resource recommendations (CPU/Memory requests and limits)
+- Confidence level and reasoning
+
+## Development
 
 ### Prerequisites
 - go version v1.24.6+

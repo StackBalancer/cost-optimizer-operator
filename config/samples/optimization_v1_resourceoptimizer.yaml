@@ -4,7 +4,17 @@ metadata:
   labels:
     app.kubernetes.io/name: cost-optimizer-operator
     app.kubernetes.io/managed-by: kustomize
-  name: resourceoptimizer-sample
+  name: api-service-optimizer
+  namespace: maintenance
 spec:
-  # TODO(user): Add fields here
-  foo: bar
+  targetRef:
+    kind: Deployment
+    name: api-service
+    namespace: production
+  policy:
+    cpu:
+      min: "200m"
+      max: "800m"
+      targetUtilization: 70
+    memory:
+      bufferPercent: 20
