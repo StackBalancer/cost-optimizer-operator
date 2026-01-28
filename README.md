@@ -3,8 +3,9 @@ Kubernetes operator for automatic CPU and memory rightsizing based on workload p
 
 ## Description
 ### Status
-**Phase 1 Complete** - Controller scaffolding with CRD and initial reconciliation loop
-**Phase 2 Complete** - Metrics Collection & Analysis
+**Phase 1 Completed** - Controller scaffolding with CRD and initial reconciliation loop
+
+**Phase 2 Completed** - Metrics Collection & Analysis
 
 **Completed Features:**
 - CRD with resource optimization policies
