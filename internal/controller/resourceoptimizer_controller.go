@@ -18,12 +18,14 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
 	optimizationv1 "github.com/stackbalancer/cost-optimizer-operator/api/v1"
@@ -98,6 +100,30 @@ func (r *ResourceOptimizerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 		"Target Deployment exists",
 	)
 
+	// Check Metrics API availability
+	log.Info("Checking Metrics API availability")
+	if err := r.checkMetricsAPIAvailability(ctx, deployment); err != nil {
+		log.Error(err, "Metrics API is not available",
+			"verify if metrics-server is installed",
+		)
+
+		// Update condition status
+		addCondition(
+			&resourceOptimizer.Status,
+			"OptimizationReady",
+			metav1.ConditionFalse,
+			"MetricsAPIUnavailable",
+			"Metrics API not available. Please install metrics-server.",
+		)
+		if statusErr := r.Status().Update(ctx, resourceOptimizer); statusErr != nil {
+			log.Error(statusErr, "Failed to update status")
+		}
+
+		// Requeue after 1 minute to check again
+		return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	}
+	log.Info("Metrics API is available")
+
 	// Collect metrics and analyze
 	if err := r.analyzeAndOptimize(ctx, resourceOptimizer, deployment); err != nil {
 		log.Error(err, "Failed to analyze workload")
@@ -123,6 +149,27 @@ func (r *ResourceOptimizerReconciler) Reconcile(ctx context.Context, req ctrl.Re
 
 	return ctrl.Result{RequeueAfter: time.Minute * 15}, nil
 
+}
+
+// checkMetricsAPIAvailability verifies that the Metrics API is available
+func (r *ResourceOptimizerReconciler) checkMetricsAPIAvailability(ctx context.Context, deployment *appsv1.Deployment) error {
+	log := log.FromContext(ctx)
+
+	// Use direct metrics client instead of controller-runtime client
+	_, err := r.metricsClient.MetricsV1beta1().PodMetricses(deployment.Namespace).List(ctx, metav1.ListOptions{
+		Limit: 1,
+	})
+
+	if err != nil {
+		if k8serrors.IsNotFound(err) || k8serrors.IsMethodNotSupported(err) {
+			return fmt.Errorf("metrics API (metrics.k8s.io) not available")
+		}
+		log.Info("Error checking metrics API, but may be temporary", "error", err)
+		return err
+	}
+
+	log.Info("Metrics API check successful")
+	return nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
