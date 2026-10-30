@@ -5,6 +5,10 @@ curl -Lo ./kind https://kind.sigs.k8s.io/dl/latest/kind-linux-$(go env GOARCH)
 chmod +x ./kind
 mv ./kind /usr/local/bin/kind
 
+curl -Lo ./k3d https://github.com/k3d-io/k3d/releases/latest/download/k3d-linux-$(go env GOARCH)
+chmod +x ./k3d
+mv ./k3d /usr/local/bin/k3d
+
 curl -L -o kubebuilder https://go.kubebuilder.io/dl/latest/linux/$(go env GOARCH)
 chmod +x kubebuilder
 mv kubebuilder /usr/local/bin/
@@ -14,16 +18,15 @@ curl -LO "https://dl.k8s.io/release/$KUBECTL_VERSION/bin/linux/$(go env GOARCH)/
 chmod +x kubectl
 mv kubectl /usr/local/bin/kubectl
 
-docker network create -d=bridge --subnet=172.19.0.0/24 kind
-
 kind version
+k3d version
 
-if ! kind get clusters | grep -q cost-optimizer; then
-  kind create cluster --name cost-optimizer
+if ! k3d cluster list | grep -q cost-optimizer; then
+  k3d cluster create cost-optimizer
 fi
 
 mkdir -p ~/.kube
-kind get kubeconfig --name cost-optimizer > ~/.kube/config
+k3d kubeconfig get cost-optimizer > ~/.kube/config
 
 kubebuilder version
 docker --version
