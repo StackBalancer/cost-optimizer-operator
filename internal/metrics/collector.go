@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -47,13 +48,13 @@ func (c *Collector) CollectWorkloadMetrics(ctx context.Context, deployment *apps
 		return nil, fmt.Errorf("failed to get pod metrics: %w", err)
 	}
 
-	var totalCPU, totalMemory resource.Quantity
 	var usageData []UsageData
 
 	for _, podMetric := range podMetrics.Items {
+		var totalCPU, totalMemory resource.Quantity
 		for _, container := range podMetric.Containers {
-			totalCPU.Add(container.Usage["cpu"])
-			totalMemory.Add(container.Usage["memory"])
+			totalCPU.Add(container.Usage[v1.ResourceCPU])
+			totalMemory.Add(container.Usage[v1.ResourceMemory])
 		}
 
 		usageData = append(usageData, UsageData{

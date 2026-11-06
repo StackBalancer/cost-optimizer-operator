@@ -10,3 +10,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Devcontainer now provisions a k3d cluster for local development, so
   metrics-server is available out of the box.
+- Collected CPU and memory usage per pod no longer accumulates across pods
+  in a deployment, which previously scaled recommendations with replica count.
