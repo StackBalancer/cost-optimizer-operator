@@ -286,44 +286,53 @@ func (r *ResourceOptimizerReconciler) analyzeAndOptimize(ctx context.Context, re
 		return err
 	}
 
-	log.Info("Generated optimization recommendation",
-		"cpuRequest", recommendation.CPURequest.String(),
-		"cpuLimit", recommendation.CPULimit.String(),
-		"memoryRequest", recommendation.MemoryRequest.String(),
-		"memoryLimit", recommendation.MemoryLimit.String(),
-		"confidence", recommendation.Confidence,
-		"reason", recommendation.Reason)
+	var recs []optimizationv1.ResourceRecommendation
+	for ctr, rec := range recommendation {
+		log.Info(
+			"Generated optimization recommendation for container "+ctr,
+			"cpuRequest", rec.CPURequest.String(),
+			"cpuLimit", rec.CPULimit.String(),
+			"memoryRequest", rec.MemoryRequest.String(),
+			"memoryLimit", rec.MemoryLimit.String(),
+			"confidence", rec.Confidence,
+			"reason", rec.Reason,
+		)
 
-	// Record recommendation event
-	r.recorder.Eventf(resourceOptimizer, corev1.EventTypeNormal, "RecommendationGenerated",
-		"CPU: %s/%s, Memory: %s/%s (confidence: %.2f)",
-		recommendation.CPURequest.String(),
-		recommendation.CPULimit.String(),
-		recommendation.MemoryRequest.String(),
-		recommendation.MemoryLimit.String(),
-		recommendation.Confidence)
+		// Record recommendation event
+		r.recorder.Eventf(resourceOptimizer, corev1.EventTypeNormal, "RecommendationGenerated",
+			"CPU: %s/%s, Memory: %s/%s (confidence: %.2f), Container: %s",
+			rec.CPURequest.String(),
+			rec.CPULimit.String(),
+			rec.MemoryRequest.String(),
+			rec.MemoryLimit.String(),
+			rec.Confidence,
+			ctr)
 
-	// Update status with recommendation
-	resourceOptimizer.Status.CurrentRecommendation = &optimizationv1.ResourceRecommendation{
-		CPU: optimizationv1.CPURecommendation{
-			Request: recommendation.CPURequest.String(),
-			Limit:   recommendation.CPULimit.String(),
-		},
-		Memory: optimizationv1.MemoryRecommendation{
-			Request: recommendation.MemoryRequest.String(),
-			Limit:   recommendation.MemoryLimit.String(),
-		},
-		Confidence:  int32(recommendation.Confidence * 100),
-		Reason:      recommendation.Reason,
-		GeneratedAt: metav1.Now(),
+		// Update status with recommendation
+		recs = append(recs,
+			optimizationv1.ResourceRecommendation{
+				CPU: optimizationv1.CPURecommendation{
+					Request: rec.CPURequest.String(),
+					Limit:   rec.CPULimit.String(),
+				},
+				Memory: optimizationv1.MemoryRecommendation{
+					Request: rec.MemoryRequest.String(),
+					Limit:   rec.MemoryLimit.String(),
+				},
+				Confidence:    int32(rec.Confidence * 100),
+				Reason:        rec.Reason,
+				GeneratedAt:   metav1.Now(),
+				ContainerName: ctr,
+			},
+		)
 	}
-
+	resourceOptimizer.Status.Recommendations = recs
 	addCondition(
 		&resourceOptimizer.Status,
 		"OptimizationReady",
 		metav1.ConditionTrue,
 		"RecommendationGenerated",
-		recommendation.Reason,
+		fmt.Sprintf("Generated recommendations for %d containers", len(recs)),
 	)
 
 	return nil

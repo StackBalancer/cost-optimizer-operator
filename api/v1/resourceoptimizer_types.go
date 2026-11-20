@@ -87,9 +87,10 @@ type ResourceOptimizerStatus struct {
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// currentRecommendation holds the latest resource optimization recommendation
-	// +optional
-	CurrentRecommendation *ResourceRecommendation `json:"currentRecommendation,omitempty"`
+	// Recommendation holds the resource optimization recommendation elements
+	// +listType=map
+	// +listMapKey=containerName
+	Recommendations []ResourceRecommendation `json:"recommendations,omitempty"`
 
 	// lastOptimized indicates when the workload was last optimized
 	// +optional
@@ -113,6 +114,9 @@ type ResourceRecommendation struct {
 
 	// Timestamp when recommendation was generated
 	GeneratedAt metav1.Time `json:"generatedAt"`
+
+	// Container for which recommendation is generated
+	ContainerName string `json:"containerName"`
 }
 
 type CPURecommendation struct {

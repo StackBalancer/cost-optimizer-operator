@@ -188,10 +188,12 @@ func (in *ResourceOptimizerStatus) DeepCopyInto(out *ResourceOptimizerStatus) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
-	if in.CurrentRecommendation != nil {
-		in, out := &in.CurrentRecommendation, &out.CurrentRecommendation
-		*out = new(ResourceRecommendation)
-		(*in).DeepCopyInto(*out)
+	if in.Recommendations != nil {
+		in, out := &in.Recommendations, &out.Recommendations
+		*out = make([]ResourceRecommendation, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.LastOptimized != nil {
 		in, out := &in.LastOptimized, &out.LastOptimized

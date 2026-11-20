@@ -23,55 +23,59 @@ func NewAnalyzer() *Analyzer {
 	return &Analyzer{}
 }
 
-func (a *Analyzer) GenerateRecommendation(metrics *WorkloadMetrics, policy optimizationv1.Policy) (*Recommendation, error) {
+func (a *Analyzer) GenerateRecommendation(metrics *WorkloadMetrics, policy optimizationv1.Policy) (map[string]*Recommendation, error) {
 	if len(metrics.Usage) == 0 {
 		return nil, fmt.Errorf("no usage data available")
 	}
 
-	// Calculate CPU recommendation
-	cpuRec, cpuReason := a.calculateCPURecommendation(metrics, policy.Cpu)
+	recs := make(map[string]*Recommendation)
+	for ctr, usage := range metrics.Usage {
+		// Calculate CPU recommendation
+		cpuRec := a.calculateCPURecommendation(usage, policy.Cpu)
 
-	// Calculate Memory recommendation
-	memRec, memReason := a.calculateMemoryRecommendation(metrics, policy.Memory)
+		// Calculate Memory recommendation
+		memRec := a.calculateMemoryRecommendation(usage, policy.Memory)
+		confidence := a.calculateConfidence(usage)
+		recs[ctr] = &Recommendation{
+			CPURequest:    cpuRec.Request,
+			CPULimit:      cpuRec.Limit,
+			MemoryRequest: memRec.Request,
+			MemoryLimit:   memRec.Limit,
+			Reason:        fmt.Sprintf("CPU: %s, Memory: %s", cpuRec.Reason, memRec.Reason),
+			Confidence:    confidence,
+		}
+	}
 
-	confidence := a.calculateConfidence(metrics)
-
-	return &Recommendation{
-		CPURequest:    cpuRec.Request,
-		CPULimit:      cpuRec.Limit,
-		MemoryRequest: memRec.Request,
-		MemoryLimit:   memRec.Limit,
-		Reason:        fmt.Sprintf("CPU: %s, Memory: %s", cpuReason, memReason),
-		Confidence:    confidence,
-	}, nil
+	return recs, nil
 }
 
 type cpuRecommendation struct {
 	Request *resource.Quantity
 	Limit   *resource.Quantity
+	Reason  string
 }
 
 type memoryRecommendation struct {
 	Request *resource.Quantity
 	Limit   *resource.Quantity
+	Reason  string
 }
 
-func (a *Analyzer) calculateCPURecommendation(metrics *WorkloadMetrics, policy optimizationv1.CPUPolicy) (*cpuRecommendation, string) {
+func (a *Analyzer) calculateCPURecommendation(usage []UsageSample, policy optimizationv1.CPUPolicy) *cpuRecommendation {
 	// Get peak and average usage
-	var peak, total int64
-	for _, usage := range metrics.Usage {
-		cpu := usage.CPUUsage.MilliValue()
+
+	var peak, total, sampleCount int64
+	for _, sample := range usage {
+		cpu := sample.CPUUsage.MilliValue()
 		if cpu > peak {
 			peak = cpu
 		}
 		total += cpu
+		sampleCount += 1
 	}
-
-	avg := total / int64(len(metrics.Usage))
-
+	avg := int64(total / int64(sampleCount))
 	// Calculate target based on utilization policy
-	targetCPU := int64(float64(avg) / (float64(policy.TargetUtilization) / 100.0))
-
+	targetCPU := int64(float64(total/sampleCount) / (float64(policy.TargetUtilization) / 100.0))
 	// Apply min/max constraints
 	minCPU := resource.MustParse(policy.Min)
 	maxCPU := resource.MustParse(policy.Max)
@@ -93,21 +97,23 @@ func (a *Analyzer) calculateCPURecommendation(metrics *WorkloadMetrics, policy o
 	return &cpuRecommendation{
 		Request: request,
 		Limit:   limit,
-	}, reason
+		Reason:  reason,
+	}
 }
 
-func (a *Analyzer) calculateMemoryRecommendation(metrics *WorkloadMetrics, policy optimizationv1.MemoryPolicy) (*memoryRecommendation, string) {
+func (a *Analyzer) calculateMemoryRecommendation(usage []UsageSample, policy optimizationv1.MemoryPolicy) *memoryRecommendation {
 	// Get peak memory usage
 	var peak, total int64
-	for _, usage := range metrics.Usage {
-		mem := usage.MemoryUsage.Value()
+
+	for _, sample := range usage {
+		mem := sample.MemoryUsage.Value()
 		if mem > peak {
 			peak = mem
 		}
 		total += mem
 	}
 
-	avg := total / int64(len(metrics.Usage))
+	avg := total / int64(len(usage))
 
 	// Memory recommendation: peak + buffer percentage
 	bufferMultiplier := 1.0 + (float64(policy.BufferPercent) / 100.0)
@@ -124,12 +130,13 @@ func (a *Analyzer) calculateMemoryRecommendation(metrics *WorkloadMetrics, polic
 	return &memoryRecommendation{
 		Request: request,
 		Limit:   limit,
-	}, reason
+		Reason:  reason,
+	}
 }
 
-func (a *Analyzer) calculateConfidence(metrics *WorkloadMetrics) float64 {
+func (a *Analyzer) calculateConfidence(usage []UsageSample) float64 {
 	// Confidence based on data points and variance
-	dataPoints := len(metrics.Usage)
+	dataPoints := len(usage)
 
 	if dataPoints < 5 {
 		return 0.3 // Low confidence with few data points
@@ -140,8 +147,9 @@ func (a *Analyzer) calculateConfidence(metrics *WorkloadMetrics) float64 {
 
 	// Calculate variance for additional confidence scoring
 	var cpuValues []float64
-	for _, usage := range metrics.Usage {
-		cpuValues = append(cpuValues, float64(usage.CPUUsage.MilliValue()))
+
+	for _, sample := range usage {
+		cpuValues = append(cpuValues, float64(sample.CPUUsage.MilliValue()))
 	}
 
 	variance := a.calculateVariance(cpuValues)
