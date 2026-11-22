@@ -31,7 +31,10 @@ func (a *Analyzer) GenerateRecommendation(metrics *WorkloadMetrics, policy optim
 	recs := make(map[string]*Recommendation)
 	for ctr, usage := range metrics.Usage {
 		// Calculate CPU recommendation
-		cpuRec := a.calculateCPURecommendation(usage, policy.Cpu)
+		cpuRec, err := a.calculateCPURecommendation(usage, policy.Cpu)
+		if err != nil {
+			return nil, fmt.Errorf("container %q: %w", ctr, err)
+		}
 
 		// Calculate Memory recommendation
 		memRec := a.calculateMemoryRecommendation(usage, policy.Memory)
@@ -61,7 +64,7 @@ type memoryRecommendation struct {
 	Reason  string
 }
 
-func (a *Analyzer) calculateCPURecommendation(usage []UsageSample, policy optimizationv1.CPUPolicy) *cpuRecommendation {
+func (a *Analyzer) calculateCPURecommendation(usage []UsageSample, policy optimizationv1.CPUPolicy) (*cpuRecommendation, error) {
 	// Get peak and average usage
 
 	var peak, total, sampleCount int64
@@ -77,8 +80,17 @@ func (a *Analyzer) calculateCPURecommendation(usage []UsageSample, policy optimi
 	// Calculate target based on utilization policy
 	targetCPU := int64(float64(total/sampleCount) / (float64(policy.TargetUtilization) / 100.0))
 	// Apply min/max constraints
-	minCPU := resource.MustParse(policy.Min)
-	maxCPU := resource.MustParse(policy.Max)
+	minCPU, err := resource.ParseQuantity(policy.Min)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cpu policy min %q: %w", policy.Min, err)
+	}
+	maxCPU, err := resource.ParseQuantity(policy.Max)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cpu policy max %q: %w", policy.Max, err)
+	}
+	if minCPU.MilliValue() > maxCPU.MilliValue() {
+		return nil, fmt.Errorf("cpu policy min %s is greater than max %s", policy.Min, policy.Max)
+	}
 
 	if targetCPU < minCPU.MilliValue() {
 		targetCPU = minCPU.MilliValue()
@@ -98,7 +110,7 @@ func (a *Analyzer) calculateCPURecommendation(usage []UsageSample, policy optimi
 		Request: request,
 		Limit:   limit,
 		Reason:  reason,
-	}
+	}, nil
 }
 
 func (a *Analyzer) calculateMemoryRecommendation(usage []UsageSample, policy optimizationv1.MemoryPolicy) *memoryRecommendation {

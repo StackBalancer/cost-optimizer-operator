@@ -86,9 +86,7 @@ func TestGenerateRecommendation(t *testing.T) {
 		policy := optimizationv1.Policy{
 			Cpu:    optimizationv1.CPUPolicy{Min: "50m", Max: "500m", TargetUtilization: 70},
 			Memory: optimizationv1.MemoryPolicy{BufferPercent: 20},
-
 		}
-		
 
 		got, err := analyzer.GenerateRecommendation(metrics, policy)
 		if err == nil {
@@ -147,6 +145,50 @@ func TestGenerateRecommendation(t *testing.T) {
 
 		if got["app"].CPURequest.Cmp(wantCPURequest) != 0 {
 			t.Errorf("CPURequest = %s, want %s", got["app"].CPURequest.String(), wantCPURequest.String())
+		}
+	})
+
+	t.Run("invalid min quantity", func(t *testing.T) {
+		metrics := &WorkloadMetrics{
+			Usage: map[string][]UsageSample{
+				"app": {
+					{CPUUsage: resource.MustParse("100m"), MemoryUsage: resource.MustParse("50Mi")},
+				},
+			},
+		}
+		policy := optimizationv1.Policy{
+			Cpu:    optimizationv1.CPUPolicy{Min: "not-a-quantity", Max: "500m", TargetUtilization: 70},
+			Memory: optimizationv1.MemoryPolicy{BufferPercent: 20},
+		}
+
+		got, err := analyzer.GenerateRecommendation(metrics, policy)
+		if err == nil {
+			t.Fatal("expected an error for an invalid min quantity, got nil")
+		}
+		if got != nil {
+			t.Errorf("expected recommendation to be nil, got %v", got)
+		}
+	})
+
+	t.Run("min greater than max", func(t *testing.T) {
+		metrics := &WorkloadMetrics{
+			Usage: map[string][]UsageSample{
+				"app": {
+					{CPUUsage: resource.MustParse("100m"), MemoryUsage: resource.MustParse("50Mi")},
+				},
+			},
+		}
+		policy := optimizationv1.Policy{
+			Cpu:    optimizationv1.CPUPolicy{Min: "500m", Max: "100m", TargetUtilization: 70},
+			Memory: optimizationv1.MemoryPolicy{BufferPercent: 20},
+		}
+
+		got, err := analyzer.GenerateRecommendation(metrics, policy)
+		if err == nil {
+			t.Fatal("expected an error when min > max, got nil")
+		}
+		if got != nil {
+			t.Errorf("expected recommendation to be nil, got %v", got)
 		}
 	})
 }
